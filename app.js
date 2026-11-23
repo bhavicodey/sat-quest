@@ -407,8 +407,6 @@ function snowfall() {
     box.appendChild(f);
   }
 }
-const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-
 // ---------- boot ----------
 snowfall();
 function boot() {
