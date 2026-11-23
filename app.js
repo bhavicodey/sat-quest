@@ -1,7 +1,7 @@
 // app.js: SAT Quest main app (screens, lessons, progress, Google sign-in)
 
 // >>> Paste your Google OAuth Web Client ID here. Leave as-is to use guest mode only.
-const GOOGLE_CLIENT_ID = "PASTE_YOUR_CLIENT_ID.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "54844873818-fk2mm0gqvatc25pcaf18qf3lb8j1ddt6.apps.googleusercontent.com";
 
 const TOTAL_LEVELS = 100;
 const POINTS_PER_LEVEL = 12;   // 400 -> 1600 is 1200 points spread over 100 levels
