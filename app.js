@@ -101,8 +101,9 @@ function renderAuth() {
   <div class="screen">
     <div class="hero" style="margin-top:44px">
       <div class="fox wave">${FOX}</div>
-      <div class="title">SAT Quest</div>
-      <p class="muted enter" style="--d:.2s;font-size:16px">24 question types. 100 levels.<br>Level up from where you are to your dream score.</p>
+      <div class="garland"></div>
+      <div class="title">🎄 SAT Quest 🎄</div>
+      <p class="muted enter" style="--d:.2s;font-size:16px">24 question types. 100 levels.<br>Deck the halls with a higher score. ❄️</p>
     </div>
     <div class="card enter" style="--d:.35s;margin-top:28px;display:grid;gap:14px;justify-items:center">
       <div id="gbtn"></div>
@@ -389,7 +390,27 @@ function renderResult(r) {
   const rt = $("#retry"); if (rt) rt.onclick = () => startLesson(r.n);
 }
 
+// ---------- festive snowfall ----------
+function snowfall() {
+  const box = document.getElementById("snow");
+  if (!box) return;
+  const flakes = ["❄", "❅", "❆", "•"];
+  for (let i = 0; i < 45; i++) {
+    const f = document.createElement("span");
+    f.className = "flake";
+    f.textContent = pick(flakes);
+    f.style.left = Math.random() * 100 + "%";
+    f.style.fontSize = (8 + Math.random() * 14) + "px";
+    f.style.opacity = (0.4 + Math.random() * 0.5).toFixed(2);
+    f.style.animationDuration = (9 + Math.random() * 14) + "s";
+    f.style.animationDelay = (-Math.random() * 20) + "s";
+    box.appendChild(f);
+  }
+}
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
 // ---------- boot ----------
+snowfall();
 function boot() {
   if (!session) return renderAuth();
   loadProfile();
