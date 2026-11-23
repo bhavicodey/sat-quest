@@ -16,5 +16,14 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET" || new URL(e.request.url).origin !== self.location.origin) return;
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+  // Network first: visitors always get the newest files; the cache is only a fallback when offline.
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
