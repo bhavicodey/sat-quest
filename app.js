@@ -49,6 +49,7 @@ function loadProfile() {
   profile.df = profile.df || {};       // per difficulty
   profile.recent = profile.recent || [];
   profile.sessions = profile.sessions || [];
+  gameState(profile);                  // Kryllion game state (profile.game)
 }
 function saveProfile() { store.set(profileKey(), profile); }
 
@@ -85,7 +86,7 @@ function signIn(user) {
   session = user;
   store.set("satquest:session", session);
   loadProfile();
-  if (profile) renderMap(); else renderOnboarding();
+  if (profile) renderHome(); else renderOnboarding();
 }
 function signOut() {
   stopTimer();
@@ -152,7 +153,7 @@ function renderOnboarding() {
   go.onclick = () => {
     profile = { start: +s.value, target: +t.value, done: {}, stats: {}, xp: 0, streak: 0, lastDay: null };
     saveProfile(); loadProfile();
-    renderMap();
+    renderHome();
   };
 }
 
@@ -187,6 +188,7 @@ function topbar() {
   return `<div class="topbar">
     ${BRAND}
     <div class="tb-right">
+      <span class="pill rankpill" title="Rank">${esc(rankFor(profile.xp).name)}</span>
       <span class="pill" title="Day streak">Streak ${profile.streak}</span>
       <span class="pill" title="Experience points">${profile.xp} XP</span>
       <button class="pill" id="outBtn">Sign out</button>
@@ -226,13 +228,11 @@ function renderMap() {
     </div>
     <div class="actions enter" style="--d:.1s">
       <button class="btn" id="contBtn">Continue · Level ${next}</button>
-      <div class="row2">
-        <button class="btn ghost" id="labBtn">Practice lab</button>
-        <button class="btn ghost" id="skillsBtn">Analytics</button>
-      </div>
+
     </div>
     <div class="path">${path}</div>
-  </div>`;
+  </div>${navHTML("campaign")}`;
+  bindNav();
 
   requestAnimationFrame(() => requestAnimationFrame(() => {
     const c = app.querySelector(".ring .val");
@@ -240,8 +240,6 @@ function renderMap() {
   }));
   app.querySelectorAll(".node").forEach(b => b.onclick = () => startLevel(+b.dataset.n));
   $("#contBtn").onclick = () => startLevel(next);
-  $("#labBtn").onclick = renderLab;
-  $("#skillsBtn").onclick = renderAnalytics;
   $("#outBtn").onclick = signOut;
 }
 
@@ -280,9 +278,10 @@ function renderAnalytics() {
       <div class="label" style="margin-top:18px">Focus areas</div>
       <p class="small" style="margin:6px 0 0">${weak.length ? weak.map(s => esc(s.name) + ` (${pct(profile.sk[s.id].c, profile.sk[s.id].t)}%)`).join("; ") : "Answer at least 3 questions in a skill to see focus areas."}</p>
     </div>
-    <div class="actions"><button class="btn ghost" id="back">Back to map</button></div>
-  </div>`;
-  $("#back").onclick = renderMap;
+    <div class="actions"><button class="btn ghost" id="back">Back to profile</button></div>
+  </div>${navHTML("profile")}`;
+  bindNav();
+  $("#back").onclick = renderProfile;
   $("#outBtn").onclick = signOut;
   requestAnimationFrame(() => app.querySelectorAll(".bar>i").forEach(i => { const w = i.style.width; i.style.width = "0"; requestAnimationFrame(() => (i.style.width = w)); }));
 }
@@ -323,9 +322,9 @@ function renderLab() {
     </div>
     <div class="actions">
       <button class="btn" id="startLab">Start practice</button>
-      <button class="btn ghost" id="back">Back to map</button>
     </div>
-  </div>`;
+  </div>${navHTML("lab")}`;
+  bindNav();
   const fSec = $("#fSec"), fDom = $("#fDom"), fSkill = $("#fSkill"), fSub = $("#fSub");
   const fill = () => {
     const sec = fSec.value;
@@ -383,13 +382,16 @@ function renderLab() {
     }
     go({ skills: weak.map(s => s.id) }, "adaptive", 10, false, "Weak skills: " + weak.map(s => s.name).join(", "));
   });
-  $("#back").onclick = renderMap;
   $("#outBtn").onclick = signOut;
 }
 
 // ---------- sessions (levels and practice share one engine) ----------
 const recentSet = () => new Set(profile.recent);
 function nextFromFilter(filter, diff) {
+  if (filter.queue) {    // repair runs: one question per anomaly, in order
+    const a = filter.queue[S ? S.qs.length % filter.queue.length : 0];
+    return makeQuestion({ skill: a.skill, sub: a.sub }, new Set([...profile.recent, a.qid]));
+  }
   if (filter.skills) {   // weak-skill practice: rotate through the chosen skills
     const sk = filter.skills[S ? S.qs.length % filter.skills.length : 0];
     return makeQuestion({ skill: sk, diff }, recentSet());
@@ -404,7 +406,7 @@ function levelDiff(n, j, boss) {
 function startLevel(n) {
   const boss = n % 10 === 0, base = boss ? 10 : 8;
   const unit = UNITS[Math.floor((n - 1) / 10)];
-  S = { mode: "level", n, boss, base, qs: [], log: [], i: 0, hearts: 3, correct: 0, attempts: 0, sel: null, answered: false, xpGain: 0 };
+  S = { mode: "level", runId: "L" + Date.now(), n, boss, base, qs: [], log: [], i: 0, hearts: 3, correct: 0, attempts: 0, sel: null, answered: false, xpGain: 0 };
   for (let j = 0; j < base; j++) {
     // Most questions come from the unit's domains; two per level are mixed review.
     const f = unit.domains && j < base - 2 ? { domains: unit.domains } : {};
@@ -414,8 +416,8 @@ function startLevel(n) {
   S.base = S.qs.length;
   renderQuestion();
 }
-function startPractice({ filter, diff, count, timed, label }) {
-  S = { mode: "practice", filter, diff, count, timed, label, qs: [], log: [], i: 0, correct: 0, attempts: 0, sel: null, answered: false, xpGain: 0,
+function startPractice({ filter, diff, count, timed, label, mission }) {
+  S = { mode: "practice", runId: "P" + Date.now() + Math.random(), mission: mission || null, filter, diff, count, timed, label, qs: [], log: [], i: 0, correct: 0, attempts: 0, sel: null, answered: false, xpGain: 0,
         adapt: { level: 1, streak: 0 }, started: Date.now() };
   const first = nextFromFilter(filter, currentDiff());
   if (!first) { openModal(`<p>No questions match those settings.</p><button class="btn ghost" id="closeM">OK</button>`); $("#closeM").onclick = closeModal; return; }
@@ -484,6 +486,7 @@ function renderQuestion() {
       ${S.mode === "level" ? `<div class="pill hearts" aria-label="${S.hearts} lives left">${heartsHTML()}</div>` : S.timed ? `<div class="pill mono" id="timer">--:--</div>` : `<div class="pill mono">${num}/${total}</div>`}
     </div>
     <div class="card qcard">
+      ${S.mission ? `<div class="mhud"><span class="label hl">${esc(missionLabel(S.mission))}</span><span class="mono">${S.correct} signal${S.correct === 1 ? "" : "s"} restored</span></div>` : ""}
       <div class="qmeta">
         <span class="chip">${esc(SECTIONS[q.sec])}</span>
         <span class="chip ghost">${esc(dom.name)}</span>
@@ -498,7 +501,7 @@ function renderQuestion() {
       <div id="fb"></div>
     </div>
     <div class="actions"><button class="btn" id="action" disabled>Check</button></div>
-    <div class="foot mono">KRYLLION · verified question</div>
+    <div class="foot mono">KRYLLION · ${esc(SECTORS[q.domain].name)} · verified question</div>
   </div>`;
   S.shownAt = Date.now();
   app.querySelectorAll(".choice").forEach(b => b.onclick = () => {
@@ -510,6 +513,7 @@ function renderQuestion() {
   $("#action").onclick = () => (S.answered ? nextQuestion() : check());
   $("#quit").onclick = () => {
     if (S.mode === "practice" && S.attempts) { if (confirm("End this practice set now? Your answers so far are saved.")) finishPractice(); return; }
+    if (S.mode === "practice") { if (confirm("Leave? Nothing has been answered yet.")) renderHome(); return; }
     if (confirm("Leave this level? Progress on it is lost.")) renderMap();
   };
   if (S.mode === "practice" && S.timed) {
@@ -551,8 +555,10 @@ function check() {
   S.answered = true;
   S.attempts++;
   record(q, ok, secs);
-  S.log.push({ q, sel: S.sel, ok, secs });
-  if (ok) { S.correct++; S.xpGain += 10; }
+  const g = gameOnAnswer(profile, q, ok, { runId: S.runId, index: S.i });
+  S.xpGain += g.xp;
+  S.log.push({ q, sel: S.sel, ok, secs, events: g.events, xp: g.xp });
+  if (ok) S.correct++;
   if (S.mode === "level" && !ok) {
     S.hearts = Math.max(0, S.hearts - 1);
     if (!q.retry) S.qs.push({ ...q, retry: true });   // missed questions come back once
@@ -569,7 +575,7 @@ function check() {
     if (k === q.answer) b.classList.add("right");
     else if (k === S.sel) b.classList.add("wrong");
   });
-  $("#fb").innerHTML = explanationHTML(q, S.sel);
+  $("#fb").innerHTML = eventsHTML(g.events, g.xp) + explanationHTML(q, S.sel);
   const action = $("#action");
   const last = S.mode === "level" ? (S.hearts <= 0 || S.i + 1 >= S.qs.length) : S.i + 1 >= S.count;
   action.textContent = last ? "See results" : "Continue";
@@ -613,26 +619,34 @@ function updateStreak() {
 
 function finishLevel() {
   stopTimer();
+  if (S.finished) return; S.finished = true;
   const acc = S.attempts ? S.correct / S.attempts : 0;
   const outOfHearts = S.hearts <= 0;
   const passed = !outOfHearts && acc >= PASS_ACCURACY;
   const stars = acc >= 0.9 ? 3 : acc >= 0.75 ? 2 : 1;
   const gain = S.xpGain + (passed ? 25 + (S.boss ? 50 : 0) : 0);
   if (passed) profile.done[S.n] = Math.max(profile.done[S.n] || 0, stars);
+  const rankBefore = rankFor(profile.xp).index;
   profile.xp += gain;
   updateStreak();
+  const extra = checkAchievements(profile);
+  extra.forEach(a => { profile.xp += a[3]; });
   saveProfile();
-  renderResult({ passed, outOfHearts, stars, acc, gain });
+  renderResult({ passed, outOfHearts, stars, acc, gain: gain + extra.reduce((t, a) => t + a[3], 0), events: extra.map(a => ({ kind: "ach", text: "Achievement: " + a[1] })), rankUp: rankFor(profile.xp).index > rankBefore });
 }
 function finishPractice(timeUp) {
   stopTimer();
+  if (S.finished) return; S.finished = true;
   const acc = S.attempts ? S.correct / S.attempts : 0;
+  const rankBefore = rankFor(profile.xp).index;
+  if (S.attempts) updateStreak();
+  let mres = null;
+  if (S.mission) { mres = gameOnMissionEnd(profile, S.mission, { attempts: S.attempts, correct: S.correct }); S.xpGain += mres.xp; }
   profile.xp += S.xpGain;
   profile.sessions.push({ at: Date.now(), label: S.label, n: S.attempts, c: S.correct });
   if (profile.sessions.length > 50) profile.sessions.shift();
-  if (S.attempts) updateStreak();
   saveProfile();
-  renderResult({ passed: null, acc, gain: S.xpGain, timeUp });
+  renderResult({ passed: mres ? mres.passed : null, acc, gain: S.xpGain, timeUp, events: mres ? mres.events : [], rankUp: rankFor(profile.xp).index > rankBefore });
 }
 
 function breakdownHTML() {
@@ -648,9 +662,11 @@ function reviewHTML() {
 
 function renderResult(r) {
   const practice = S.mode === "practice";
-  const title = practice ? (r.timeUp ? "Time is up" : "Set complete")
+  const mission = practice && S.mission ? MISSIONS[S.mission.type] : null;
+  const title = mission ? (r.timeUp ? "Time is up" : mission.name + (S.mission.type === "repair" ? " complete" : r.passed ? " complete" : " incomplete"))
+    : practice ? (r.timeUp ? "Time is up" : "Set complete")
     : r.passed ? (S.boss ? "Unit assessment passed" : "Level complete") : (r.outOfHearts ? "Out of lives" : "Not yet");
-  const sub = practice ? esc(S.label)
+  const sub = practice ? esc(S.mission ? missionLabel(S.mission) : S.label)
     : r.passed ? "" : r.outOfHearts ? "Lives refill when you try again." : `You need ${Math.round(PASS_ACCURACY * 100)}% accuracy to unlock the next level.`;
   const starRow = !practice && r.passed ? `<div class="stars-big">${[0, 1, 2].map(k => `<span class="${k < r.stars ? "" : "off"}" style="--d:${0.2 + k * 0.15}s">★</span>`).join("")}</div>` : "";
   const totalSecs = S.log.reduce((a, e) => a + e.secs, 0);
@@ -662,7 +678,9 @@ function renderResult(r) {
       ${starRow}
       ${sub ? `<p class="muted enter" style="--d:.1s">${sub}</p>` : ""}
     </div>
-    <div class="card enter" style="--d:.2s;margin-top:20px">
+    ${rankCardHTML(r)}
+    ${(r.events || []).length ? `<div class="card enter" style="--d:.15s;margin-top:14px"><div class="label">Mission log</div>${eventsHTML(r.events, 0, true)}</div>` : ""}
+    <div class="card enter" style="--d:.2s;margin-top:14px">
       <div class="row-stat"><span>Accuracy</span><span class="mono">${Math.round(r.acc * 100)}%</span></div>
       <div class="row-stat"><span>Correct</span><span class="mono">${S.correct} of ${S.attempts}</span></div>
       <div class="row-stat"><span>Average time</span><span class="mono">${S.attempts ? Math.round(totalSecs / S.attempts) : 0}s per question</span></div>
@@ -674,15 +692,202 @@ function renderResult(r) {
     <div class="actions enter" style="--d:.4s">
       ${!practice && r.passed && S.n < TOTAL_LEVELS ? `<button class="btn" id="nxt">Next level →</button>` : ""}
       ${!practice && !r.passed ? `<button class="btn" id="retry">Try again</button>` : ""}
-      ${practice ? `<button class="btn" id="again">New set, same settings</button>` : ""}
-      <button class="btn ghost" id="map">Back to map</button>
+      ${practice && !S.mission ? `<button class="btn" id="again">New set, same settings</button>` : ""}
+      ${S.mission && S.mission.dom ? `<button class="btn" id="sector">Return to ${esc(SECTORS[S.mission.dom].name)}</button>` : ""}
+      <button class="btn ghost" id="map">${S.mission || !practice ? "Star map" : "Back to map"}</button>
     </div>
   </div>`;
   window.scrollTo(0, 0);
-  $("#map").onclick = () => renderMap();
+  $("#map").onclick = () => (practice || S.mission ? renderHome() : renderMap());
+  const sc = $("#sector"); if (sc) { const d = S.mission.dom; sc.onclick = () => renderSector(d); }
   const nx = $("#nxt"); if (nx) nx.onclick = () => startLevel(S.n + 1);
   const rt = $("#retry"); if (rt) rt.onclick = () => startLevel(S.n);
   const ag = $("#again"); if (ag) { const p = { filter: S.filter, diff: S.diff, count: S.count, timed: S.timed, label: S.label }; ag.onclick = () => startPractice(p); }
+}
+
+// ======================= KRYLLION SCREENS =======================
+const NAV = [["home", "Star map"], ["campaign", "Campaign"], ["repair", "Repair bay"], ["lab", "Practice lab"], ["profile", "Profile"]];
+function navHTML(active) {
+  const n = gameState(profile).anomalies.length;
+  return `<nav class="nav" aria-label="Main">${NAV.map(([k, label]) => `<button data-nav="${k}" class="${k === active ? "on" : ""}" ${k === active ? 'aria-current="page"' : ""}><span class="ico ico-${k}" aria-hidden="true"></span><span>${label}</span>${k === "repair" && n ? `<b class="badge">${n}</b>` : ""}</button>`).join("")}</nav>`;
+}
+function bindNav() {
+  app.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => ({ home: renderHome, campaign: renderMap, repair: renderRepair, lab: renderLab, profile: renderProfile })[b.dataset.nav]());
+  const o = $("#outBtn"); if (o) o.onclick = signOut;
+}
+const missionLabel = m => MISSIONS[m.type].name + (m.skill ? " · " + skillById(m.skill).name : m.dom ? " · " + SECTORS[m.dom].name : "");
+const tierClass = t => "t" + t;
+
+function eventsHTML(events, xp, block) {
+  if (!events.length && !xp) return "";
+  return `<div class="events${block ? " block" : ""}">${xp ? `<span class="ev xp">+${xp} XP</span>` : ""}${events.map(e => `<span class="ev ${e.kind}">${esc(e.text)}</span>`).join("")}</div>`;
+}
+function rankCardHTML(r) {
+  const rk = rankFor(profile.xp);
+  return `<div class="card rankcard enter${r && r.rankUp ? " up" : ""}" style="--d:.1s;margin-top:18px">
+    ${r && r.rankUp ? `<div class="label hl">Rank up</div>` : `<div class="label">Rank</div>`}
+    <div class="rankrow"><span class="rankname">${esc(rk.name)}</span><span class="mono">${profile.xp} XP</span></div>
+    <div class="bar"><i style="width:${Math.round(rk.progress * 100)}%"></i></div>
+    <div class="muted tiny" style="margin-top:6px">${rk.next ? `${rk.next - profile.xp} XP to ${esc(rk.nextName)}` : "Highest rank reached"}</div>
+  </div>`;
+}
+
+function starMapSVG() {
+  const C = 180, rw = DOMAINS.filter(d => d.sec === "rw"), ma = DOMAINS.filter(d => d.sec === "math");
+  const place = (list, r, off) => list.map((d, i) => { const a = off + i * (Math.PI * 2 / list.length); return { d, x: C + r * Math.cos(a), y: C + r * Math.sin(a) }; });
+  const nodes = place(rw, 84, -Math.PI / 2 + Math.PI / 4).concat(place(ma, 142, -Math.PI / 2));
+  const core = coreStatus(profile);
+  const ARC = 2 * Math.PI * 24;
+  const g = nodes.map(({ d, x, y }, i) => {
+    const st = sectorStatus(profile, d.id), sec = SECTORS[d.id];
+    return `<line x1="${C}" y1="${C}" x2="${x}" y2="${y}" class="link" style="opacity:${0.12 + st.pct / 120}"/>
+    <g class="sector ${d.sec}" data-dom="${d.id}" tabindex="0" role="button" aria-label="${esc(sec.name)}, ${esc(sec.hint)}, ${st.pct}% restored" style="--d:${0.05 * i}s">
+      <circle cx="${x}" cy="${y}" r="30" class="halo"/>
+      <circle cx="${x}" cy="${y}" r="24" class="body"/>
+      <circle cx="${x}" cy="${y}" r="24" class="arc" stroke-dasharray="${ARC}" stroke-dashoffset="${ARC * (1 - st.pct / 100)}" transform="rotate(-90 ${x} ${y})"/>
+      <text x="${x}" y="${y + 4}" class="code">${sec.code}</text>
+      <text x="${x}" y="${y + 44}" class="nm">${esc(sec.name)}</text>
+    </g>`;
+  }).join("");
+  return `<svg class="starmap" viewBox="-40 0 440 395" role="group" aria-label="Kryllion star map">
+    <circle cx="${C}" cy="${C}" r="84" class="orbit"/><circle cx="${C}" cy="${C}" r="142" class="orbit"/>
+    ${g}
+    <g class="core"><circle cx="${C}" cy="${C}" r="34" class="corehalo"/><circle cx="${C}" cy="${C}" r="26" class="corebody"/>
+      <text x="${C}" y="${C + 2}" class="corepct">${core}%</text><text x="${C}" y="${C + 14}" class="corelbl">CORE</text></g>
+    <text x="-30" y="388" class="legend">Inner orbit · Reading and Writing</text><text x="390" y="388" class="legend" text-anchor="end">Outer orbit · Math</text>
+  </svg>`;
+}
+
+function renderHome() {
+  stopTimer();
+  const g = gameState(profile), dailyDone = g.daily.last === new Date().toDateString();
+  const next = nextLevel();
+  app.innerHTML = `
+  <div class="screen">
+    ${topbar()}
+    ${!g.introSeen ? `<div class="card lore enter" style="margin-top:16px"><div class="label">${esc(KRY_LORE.title)}</div><p>${esc(KRY_LORE.intro)}</p><button class="btn ghost" id="loreOk">Begin restoration</button></div>` : ""}
+    ${rankCardHTML()}
+    <div class="mapwrap enter" style="--d:.15s">${starMapSVG()}</div>
+    <div class="ops">
+      <button class="op ${dailyDone ? "done" : "hot"}" id="dailyBtn"><span class="label">Daily operation</span><b>${dailyDone ? "Completed today" : "6 questions on your weakest relays"}</b><span class="mono">${dailyDone ? "Replay for a reduced reward" : "+" + MISSIONS.daily.xp + " XP bonus"}</span></button>
+      <button class="op" id="repairBtn"><span class="label">Repair bay</span><b>${g.anomalies.length ? g.anomalies.length + " anomal" + (g.anomalies.length === 1 ? "y" : "ies") + " waiting" : "No anomalies"}</b><span class="mono">Turn mistakes into XP</span></button>
+      <button class="op" id="campBtn"><span class="label">Campaign</span><b>Level ${next} · ${esc(UNITS[Math.floor((next - 1) / 10)].name)}</b><span class="mono">${levelsDone()}/${TOTAL_LEVELS} cleared</span></button>
+    </div>
+  </div>${navHTML("home")}`;
+  bindNav();
+  const lo = $("#loreOk"); if (lo) lo.onclick = () => { g.introSeen = true; saveProfile(); renderHome(); };
+  app.querySelectorAll(".sector").forEach(el => { el.onclick = () => renderSector(el.dataset.dom); el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); renderSector(el.dataset.dom); } }; });
+  $("#dailyBtn").onclick = () => startMission("daily");
+  $("#repairBtn").onclick = renderRepair;
+  $("#campBtn").onclick = () => startLevel(next);
+}
+
+function renderSector(domId) {
+  stopTimer();
+  const st = sectorStatus(profile, domId), sec = SECTORS[domId], dom = domainById(domId);
+  const relays = st.skills.map((m, i) => {
+    const canTrial = missionUnlocked(profile, "trial", domId, m.skill.id), mastered = m.tier === 4;
+    return `<div class="relay ${tierClass(m.tier)}" style="--d:${0.04 * i}s">
+      <div class="rtop"><span class="rname">${esc(m.skill.name)}</span><span class="tier">${TIERS[m.tier]}</span></div>
+      <div class="bar"><i style="width:${mastered ? 100 : m.score}%"></i></div>
+      <div class="rbot"><span class="mono">${m.n ? m.score + " signal · " + m.n + " recent" : "No signal yet"}</span>
+        ${mastered ? `<span class="mono hl">Mastered</span>` : `<button class="mini" data-trial="${m.skill.id}" ${canTrial ? "" : "disabled"} title="${canTrial ? "" : "Charge this relay (70+ signal) to unlock"}">${canTrial ? "Mastery trial" : "Trial locked"}</button>`}</div>
+    </div>`;
+  }).join("");
+  const mcard = type => {
+    const def = MISSIONS[type], open = missionUnlocked(profile, type, domId), rec = gameState(profile).missions[missionKey(type, domId)];
+    return `<button class="mission ${open ? "" : "locked"}" data-mission="${type}" ${open ? "" : "disabled"}>
+      <div class="mtop"><b>${def.name}</b><span class="mono">${def.count} Q · ${def.diff === "adaptive" ? "Adaptive" : DIFF_NAME[def.diff]}</span></div>
+      <div class="muted small">${open ? def.desc : "Locked: " + def.req}</div>
+      <div class="mono tiny" style="margin-top:6px">${open ? `Reward up to ${def.xp} XP${rec ? " · best " + rec.best + "%" : ""}` : ""}</div></button>`;
+  };
+  app.innerHTML = `
+  <div class="screen">
+    ${topbar()}
+    <div class="card sectorhead enter" style="margin-top:16px">
+      <div class="label">Sector ${sec.code} · ${esc(SECTIONS[dom.sec])}</div>
+      <h2 class="h2" style="margin:2px 0 2px">${esc(sec.name)}</h2>
+      <div class="muted small">Official domain: ${esc(dom.name)}</div>
+      <div class="rankrow" style="margin-top:12px"><span class="small">Restoration</span><span class="mono">${st.pct}%</span></div>
+      <div class="bar"><i style="width:${st.pct}%"></i></div>
+    </div>
+    <div class="label" style="margin-top:18px">Missions</div>
+    <div class="missions">${mcard("patrol")}${mcard("scan")}${mcard("rift")}</div>
+    <div class="label" style="margin-top:18px">Relays (one per official skill)</div>
+    <div class="relays">${relays}</div>
+    <p class="muted tiny">Signal is your weighted accuracy over your last 20 answers in a skill (hard questions count most). Tiers: Calibrating under 40, Stable 40+, Charged 70+, Mastered after passing a trial.</p>
+    <div class="actions"><button class="btn ghost" id="back">Star map</button></div>
+  </div>${navHTML("home")}`;
+  bindNav();
+  $("#back").onclick = renderHome;
+  app.querySelectorAll("[data-mission]").forEach(b => b.onclick = () => startMission(b.dataset.mission, domId));
+  app.querySelectorAll("[data-trial]").forEach(b => b.onclick = () => startMission("trial", domId, b.dataset.trial));
+}
+
+function renderRepair() {
+  stopTimer();
+  const g = gameState(profile);
+  const by = {};
+  g.anomalies.forEach(a => { const k = a.skill + "/" + a.sub; (by[k] = by[k] || { a, n: 0 }).n++; });
+  const rows = Object.values(by).map(({ a, n }, i) => `<div class="anomaly" style="--d:${0.04 * i}s"><div><b>${esc(subtypeName(a.skill, a.sub))}</b><div class="muted small">${esc(skillById(a.skill).name)} · ${esc(SECTORS[skillById(a.skill).dom].name)}</div></div><span class="mono">×${n}</span></div>`).join("");
+  app.innerHTML = `
+  <div class="screen">
+    ${topbar()}
+    <div class="card enter" style="margin-top:16px">
+      <div class="label">Repair bay</div>
+      <h2 class="h2" style="margin:2px 0 8px">${g.anomalies.length ? g.anomalies.length + " anomal" + (g.anomalies.length === 1 ? "y" : "ies") + " detected" : "All systems nominal"}</h2>
+      <p class="muted small" style="margin:0">Every wrong answer logs an anomaly for that question type. A repair run gives you a <b>new</b> question of the same type; answering it correctly repairs the anomaly for +10 XP on top of the usual reward. Repeating the same question never counts. ${g.repaired ? `You have repaired ${g.repaired} so far.` : ""}</p>
+    </div>
+    ${rows ? `<div class="anomalies">${rows}</div>` : ""}
+    <div class="actions">${g.anomalies.length ? `<button class="btn" id="fix">Start repair run (${Math.min(5, g.anomalies.length)} questions)</button>` : `<button class="btn ghost" id="home">Back to star map</button>`}</div>
+  </div>${navHTML("repair")}`;
+  bindNav();
+  const f = $("#fix"); if (f) f.onclick = () => startMission("repair");
+  const h = $("#home"); if (h) h.onclick = renderHome;
+}
+
+function renderProfile() {
+  stopTimer();
+  const g = gameState(profile);
+  const ach = ACHIEVEMENTS.map(([id, name, desc, xp]) => `<div class="ach ${g.ach[id] ? "got" : ""}"><span class="dia" aria-hidden="true"></span><div><b>${esc(name)}</b><div class="muted tiny">${esc(desc)} · +${xp} XP</div></div></div>`).join("");
+  app.innerHTML = `
+  <div class="screen">
+    ${topbar()}
+    ${rankCardHTML()}
+    <div class="spec enter" style="--d:.1s">
+      <div><b>${g.correct}</b><span>signals sent</span></div>
+      <div><b>${g.repaired}</b><span>repairs</span></div>
+      <div><b>${g.missionsDone || 0}</b><span>missions</span></div>
+    </div>
+    <div class="card enter" style="--d:.15s;margin-top:14px">
+      <div class="label">Achievements · ${Object.keys(g.ach).length}/${ACHIEVEMENTS.length}</div>
+      <div class="achs">${ach}</div>
+    </div>
+    <div class="card enter" style="--d:.2s;margin-top:14px">
+      <div class="label">Ranks</div>
+      <div class="ranks">${RANKS.map(([x, n], i) => `<span class="${i <= rankFor(profile.xp).index ? "on" : ""}">${esc(n)}<i class="mono">${x}</i></span>`).join("")}</div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="anBtn">Detailed analytics</button>
+    </div>
+  </div>${navHTML("profile")}`;
+  bindNav();
+  $("#anBtn").onclick = renderAnalytics;
+}
+
+function startMission(type, dom, skill) {
+  const def = MISSIONS[type], g = gameState(profile);
+  let filter;
+  if (type === "patrol" || type === "scan" || type === "rift") filter = { domain: dom };
+  else if (type === "trial") filter = { skill };
+  else if (type === "daily") filter = { skills: weakRelays(profile, 3) };
+  else if (type === "repair") {
+    if (!g.anomalies.length) return renderRepair();
+    filter = { queue: g.anomalies.slice(0, 5) };
+  }
+  const count = type === "repair" ? Math.min(5, g.anomalies.length) : def.count;
+  const secs = type === "daily" ? [...new Set(filter.skills.map(sectionOfSkill))] : null;
+  startPractice({ filter, diff: def.diff, count, timed: false, label: def.name, mission: { type, dom, skill, secs } });
 }
 
 // ---------- boot ----------
@@ -690,7 +895,7 @@ function boot() {
   if (!session) return renderAuth();
   loadProfile();
   if (!profile) return renderOnboarding();
-  renderMap();
+  renderHome();
 }
 boot();
 

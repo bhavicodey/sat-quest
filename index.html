@@ -216,6 +216,92 @@ select:disabled{opacity:.45}
 .boot .orb{width:44px;height:44px;margin:0 auto 18px;border-radius:50%;border:1px solid rgba(122,162,255,.25);border-top-color:var(--cyan);animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+
+/* ===== Kryllion game layer ===== */
+.app{padding-bottom:110px}
+.nav{position:fixed;left:50%;bottom:0;transform:translateX(-50%);width:min(560px,100%);display:grid;grid-template-columns:repeat(5,1fr);gap:2px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:rgba(5,7,15,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);z-index:8}
+.nav button{position:relative;background:none;border:0;color:var(--dim);font-family:inherit;font-size:10.5px;display:grid;justify-items:center;gap:4px;padding:6px 2px;border-radius:10px;cursor:pointer;transition:color .2s,background .2s}
+.nav button.on{color:var(--cyan);background:rgba(34,211,238,.07)}
+.nav button:hover{color:var(--text)}
+.nav .badge{position:absolute;top:2px;right:14%;background:var(--bad);color:#1a0505;font-size:9.5px;border-radius:99px;padding:1px 5px;font-family:var(--mono)}
+.ico{width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;position:relative}
+.ico-home::after{content:"";position:absolute;width:4px;height:4px;background:currentColor;border-radius:50%;top:-3px;left:5px}
+.ico-campaign{border-radius:4px;transform:rotate(45deg) scale(.8)}
+.ico-repair{border-radius:3px}.ico-repair::after{content:"";position:absolute;inset:6px 2px auto;height:1.5px;background:currentColor}
+.ico-lab{border-radius:50% 50% 4px 4px}
+.ico-profile::after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;background:currentColor;top:4px;left:4.5px}
+.rankpill{color:var(--cyan);border-color:rgba(34,211,238,.35)}
+.rankcard .rankrow,.rankrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.rankname{font-size:22px;font-weight:700;letter-spacing:-.01em}
+.rankcard.up{border-color:rgba(34,211,238,.6);box-shadow:0 0 0 1px rgba(34,211,238,.2),0 0 40px -10px rgba(34,211,238,.5)}
+.lore p{line-height:1.6;margin:6px 0 14px;color:#d7def0}
+.mapwrap{margin:14px 0 4px}
+.starmap{width:100%;height:auto;display:block}
+.starmap .orbit{fill:none;stroke:rgba(122,162,255,.14);stroke-dasharray:2 5}
+.starmap .link{stroke:var(--cyan);stroke-width:1}
+.starmap .sector{cursor:pointer;animation:pop .5s var(--ease) both;animation-delay:var(--d,0s);outline:none}
+.starmap .halo{fill:rgba(34,211,238,.06);stroke:none;transition:fill .2s}
+.starmap .sector.math .halo{fill:rgba(139,92,246,.07)}
+.starmap .sector:hover .halo,.starmap .sector:focus .halo{fill:rgba(34,211,238,.18)}
+.starmap .body{fill:#0b1226;stroke:rgba(122,162,255,.25);stroke-width:1}
+.starmap .arc{fill:none;stroke:var(--cyan);stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset 1s var(--ease)}
+.starmap .sector.math .arc{stroke:#a78bfa}
+.starmap .code{fill:#fff;font:700 12px var(--mono);text-anchor:middle}
+.starmap .nm{fill:var(--muted);font:500 10px Inter,system-ui,sans-serif;text-anchor:middle}
+.starmap .corehalo{fill:rgba(34,211,238,.08);animation:breathe 4s ease-in-out infinite}
+@keyframes breathe{50%{fill:rgba(34,211,238,.16)}}
+.starmap .corebody{fill:#06101f;stroke:var(--cyan);stroke-width:1.5}
+.starmap .corepct{fill:#fff;font:700 14px var(--mono);text-anchor:middle}
+.starmap .corelbl{fill:var(--cyan);font:600 7px var(--mono);letter-spacing:.2em;text-anchor:middle}
+.starmap .legend{fill:var(--dim);font:500 9px var(--mono)}
+.ops{display:grid;gap:10px;margin-top:6px}
+.op{display:grid;gap:3px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:var(--text);font-family:inherit;cursor:pointer;transition:border-color .2s,transform .2s var(--ease)}
+.op:hover{border-color:var(--line-hi);transform:translateY(-1px)}
+.op b{font-size:15px;font-weight:600}.op .label{margin:0}
+.op .mono{color:var(--muted);font-size:11.5px}
+.op.hot{border-color:rgba(34,211,238,.5);box-shadow:0 0 30px -14px rgba(34,211,238,.6)}
+.op.done{opacity:.75}
+.missions{display:grid;gap:10px}
+.mission{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:var(--text);font-family:inherit;cursor:pointer;transition:border-color .2s}
+.mission:hover:not(:disabled){border-color:rgba(34,211,238,.5)}
+.mission.locked{opacity:.5;cursor:not-allowed}
+.mtop{display:flex;justify-content:space-between;gap:10px;margin-bottom:4px}
+.relays{display:grid;gap:10px}
+.relay{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:rgba(5,7,15,.5);animation:rise .4s var(--ease) both;animation-delay:var(--d,0s)}
+.rtop,.rbot{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.rtop{margin-bottom:8px}.rbot{margin-top:8px}
+.rname{font-size:14px;font-weight:600}
+.tier{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--dim)}
+.relay.t1 .tier{color:#fcd34d;border-color:rgba(252,211,77,.3)}
+.relay.t2 .tier{color:#93c5fd;border-color:rgba(147,197,253,.35)}
+.relay.t3 .tier{color:var(--cyan);border-color:rgba(34,211,238,.45)}
+.relay.t4 .tier{color:#04121a;background:var(--cyan);border-color:var(--cyan)}
+.relay.t4{border-color:rgba(34,211,238,.45)}
+.mini{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.35);color:var(--cyan);border-radius:8px;padding:5px 10px;font-size:12px;font-family:inherit;cursor:pointer}
+.mini:disabled{opacity:.45;cursor:not-allowed;color:var(--muted);border-color:var(--line);background:none}
+.anomalies{display:grid;gap:8px;margin-top:14px}
+.anomaly{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid rgba(248,113,113,.25);border-left:2px solid var(--bad);border-radius:10px;padding:11px 14px;background:rgba(248,113,113,.04);animation:rise .4s var(--ease) both;animation-delay:var(--d,0s)}
+.events{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.events.block{flex-direction:column;align-items:flex-start}
+.ev{font-size:12.5px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(5,7,15,.6);animation:rise .35s var(--ease) both}
+.ev.xp{color:#04121a;background:var(--cyan);border-color:var(--cyan);font-weight:700;font-family:var(--mono)}
+.ev.signal,.ev.mission{color:var(--cyan);border-color:rgba(34,211,238,.35)}
+.ev.repair{color:var(--ok);border-color:rgba(52,211,153,.4)}
+.ev.anomaly{color:#fca5a5;border-color:rgba(248,113,113,.4)}
+.ev.tier{color:#c4b5fd;border-color:rgba(139,92,246,.5);background:rgba(139,92,246,.1)}
+.ev.ach{color:var(--star);border-color:rgba(232,195,106,.45)}
+.mhud{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.mhud .label{margin:0}
+.achs{display:grid;gap:8px}
+.ach{display:flex;gap:12px;align-items:center;opacity:.45}
+.ach.got{opacity:1}
+.dia{flex:none;width:12px;height:12px;transform:rotate(45deg);border:1.5px solid var(--dim)}
+.ach.got .dia{background:var(--star);border-color:var(--star);box-shadow:0 0 10px rgba(232,195,106,.5)}
+.ranks{display:flex;flex-wrap:wrap;gap:6px}
+.ranks span{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:5px 9px;color:var(--dim);display:flex;gap:6px;align-items:baseline}
+.ranks span.on{color:var(--text);border-color:rgba(34,211,238,.4)}
+.ranks i{font-style:normal;font-size:10px;color:var(--dim)}
+
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important}
 }
@@ -234,6 +320,7 @@ select:disabled{opacity:.45}
 <script src="questions.js"></script>
 <script src="rw-bank.js"></script>
 <script src="math-gen.js"></script>
+<script src="game.js"></script>
 <script src="app.js"></script>
 <!-- Google Identity Services. initGoogle() runs once the script has loaded. -->
 <script src="https://accounts.google.com/gsi/client" async defer onload="initGoogle()"></script>
