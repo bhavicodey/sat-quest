@@ -1,6 +1,6 @@
 // Service worker: makes the app load offline. Bump CACHE (e.g. "satquest-v2") whenever you change app files.
-const CACHE = "satquest-v3";
-const FILES = ["./", "index.html", "app.js", "questions.js", "icon.svg", "manifest.json"];
+const CACHE = "satquest-v4";
+const FILES = ["./", "index.html", "app.js", "questions.js", "rw-bank.js", "math-gen.js", "icon.svg", "manifest.json"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)));
